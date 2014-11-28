@@ -24,7 +24,11 @@ function which performs a single read operation. The initial prototype was defin
 as follows:
 
 ~~~~
-int uv_read(uv_read_t* req, uv_stream_t* handle, uv_buf_t[] bufs, unsigned int nbufs, uv_read_cb, cb)
+int uv_read(uv_read_t* req,
+            uv_stream_t* handle,
+            const uv_buf_t[] bufs,
+            unsigned int nbufs,
+            uv_read_cb, cb)
 ~~~~
 
 The read callback is defined as:
@@ -38,7 +42,10 @@ which might not be desirable in all cases. For this reason, a secondary version 
 an allocation callback is also proposed:
 
 ~~~~
-int uv_read2(uv_read_t* req, uv_stream_t* handle, uv_alloc_cb alloc_cb, uv_read_cb cb)
+int uv_read_alloc(uv_read_t* req,
+                  uv_stream_t* handle,
+                  uv_alloc_cb alloc_cb,
+                  uv_read_cb cb)
 ~~~~
 
 Applications can use one or the other or mixed without problems.
@@ -50,13 +57,15 @@ is valid until the request callback is called.
 
 Inline reading: if there are no conditions which would prevent otherwise, we could try to do
 a read on the spot. This should work ok if the user provided preallocated buffers, because
-we can hold on to them if we get EAGAIN. If `uv_read2` is used, instead, we won’t attempt
+we can hold on to them if we get EAGAIN. If `uv_read_alloc` is used, instead, we won’t attempt
 to read on the spot because the allocation callback would have to be called and we’d end
 up holding on to the buffer for too long, thus defeating the purpose of deferred allocation.
 A best effort inline reading function is also proposed:
 
 ~~~~
-int uv_try_read(uv_stream_t* handle, uv_buf_t[] bufs, int nbufs)
+int uv_try_read(uv_stream_t* handle,
+                const uv_buf_t[] bufs,
+                unsigned int nbufs)
 ~~~~
 
 It does basically the analogous to `uv_try_write`, that is, attempt to read inline and
@@ -64,12 +73,15 @@ doesn’t queue a request if it doesn’t succeed.
 
 ### uv_stream_poll
 
-In case `uv_read` and `uv_read2` are not enough, another way to read or write on streams
+In case `uv_read` and `uv_read_alloc` are not enough, another way to read or write on streams
 would be to get a callback when the stream is readable / writable, and use the `uv_try_*`
 family of functions to perform the reads and writes inline. The proposed API for this:
 
 ~~~~
-int uv_stream_poll(uv_stream_poll_t* req, uv_stream_t* handle, int events, uv_stream_poll cb)
+int uv_stream_poll(uv_stream_poll_t* req,
+                   uv_stream_t* handle,
+                   int events,
+                   uv_stream_poll cb)
 ~~~~
 
 `events` would be a mask composed of `UV_READABLE` and / or `UV_WRITABLE`.
@@ -91,8 +103,15 @@ This proposal removes the timer handle and makes timers a request, which gets it
 called when the timeout is hit:
 
 ~~~~
-int uv_timeout(uv_timeout_t* req, uv_loop_t* loop, int timeout, uv_timeout_cb cb)
+int uv_timeout(uv_timeout_t* req,
+               uv_loop_t* loop,
+               double timeout,
+               uv_timeout_cb cb)
 ~~~~
+
+The `timeout` is now expressed as a double. The fractional part will get rounded up
+to platform granularity. For example: 1.2345 becomes 1230 ms or 1,234,500 us,
+depending on whether the platform supports sub-millisecond precision.
 
 Timers are one shot, so no assumptions are made and repeating timers can be easily
 implemented on top (by users).
@@ -115,7 +134,7 @@ In certain environments users would like to get a callback called by the event l
 scheduling this callback would happen from a different thread. This can be implemented using
 `uv_async_t` handles in combination with some sort of thread safe queue, but it’s not
 straightforward. Also, many have fallen in the trap of `uv_async_send` coalescing calls,
-that is, calling the function X times does yield the callback being called X times; it’s
+that is, calling the function X times does not yield the callback being called X times; it’s
 called at least once.
 
 `uv_callback` requests will queue the given callback, so that it’s called “as soon as
@@ -133,17 +152,24 @@ The callback definition:
 typedef void (*uv_callback_cb)(uv_callback_t* req, int status)
 ~~~~
 
+Implementation detail: since the callback request cannot be safely initialized outside
+of the loop thread, when `uv_callback_threadsafe` is used, the request will be put
+in a queue which will be processed by the loop at some point, fully initializing the
+requests.
+
 The introduction of `uv_callback` would deprecate and remove `uv_async_t` handles.
-Now, in some cases it might be desired to just wakeup the event loop, and having to
+Now, in some cases it might be desired to just wake up the event loop, and having to
 create a request might be too much, thus, the following API call is also proposed:
 
 ~~~~
-void uv_loop_wakeup(const uv_loop_t* loop)
+void uv_loop_wakeup(uv_loop_t* loop)
 ~~~~
 
-Which would just wakeup the event loop in case it was blocked waiting for i/o.
+Which would just wake up the event loop in case it was blocked waiting for i/o.
 
-Implementation detail: the underlying mechanism for `uv_async_t` would remain (at least on Unix).
+Implementation detail: the underlying mechanism for waking up the loop will be decided
+later on. The current `uv_async_t` machanism could remain (on Unix) or atomic ops
+could be used instead.
 
 Note: As a result of this addition, `uv_idle_t` handles will be deprecated an removed.
 It may not seem obvious at first, but `uv_callback` achieves the same: the loop won’t block
