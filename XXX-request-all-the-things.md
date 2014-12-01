@@ -37,45 +37,26 @@ The read callback is defined as:
 typedef void (*uv_read_cb)(uv_read_t* req, int status)
 ~~~~
 
-This approach has one problem, though: memory for reading needs to be allocated upfront,
-which might not be desirable in all cases. For this reason, a secondary version which takes
-an allocation callback is also proposed:
-
-~~~~
-int uv_read_alloc(uv_read_t* req,
-                  uv_stream_t* handle,
-                  uv_alloc_cb alloc_cb,
-                  uv_read_cb cb)
-~~~~
-
-Applications can use one or the other or mixed without problems.
-
 Implementation details: we probably will want to have some `bufsml` of size 4 where we
 copy the structures when the request is created, like `uv_write` does. Thus, the user can
 pass a `uv_buf_t` array which is allocated on the stack, as long as the memory in each `buf->base`
 is valid until the request callback is called.
 
-Inline reading: if there are no conditions which would prevent otherwise, we could try to do
-a read on the spot. This should work ok if the user provided preallocated buffers, because
-we can hold on to them if we get EAGAIN. If `uv_read_alloc` is used, instead, we won’t attempt
-to read on the spot because the allocation callback would have to be called and we’d end
-up holding on to the buffer for too long, thus defeating the purpose of deferred allocation.
-A best effort inline reading function is also proposed:
+Inline reading: if the passed callback `cb` is NULL and there are no more queued read requests
+an attempt to read inline will be made.
 
-~~~~
-int uv_try_read(uv_stream_t* handle,
-                const uv_buf_t[] bufs,
-                unsigned int nbufs)
-~~~~
 
-It does basically the analogous to `uv_try_write`, that is, attempt to read inline and
-doesn’t queue a request if it doesn’t succeed.
+### uv_write and uv_try_write
+
+`uv_write` will be modified to behave just like `uv_read`, that is, try to do the operation
+inline if `cb` is NULL, and thus `uv_try_write` will be removed.
+
 
 ### uv_stream_poll
 
-In case `uv_read` and `uv_read_alloc` are not enough, another way to read or write on streams
-would be to get a callback when the stream is readable / writable, and use the `uv_try_*`
-family of functions to perform the reads and writes inline. The proposed API for this:
+In case `uv_read` and `uv_write` are not enough, another way to read or write on streams
+is to get a callback when the stream is readable / writable, and use `uv_read` and `uv_write`
+to perform the reads and writes inline (passing a NULL callback). The proposed API for this:
 
 ~~~~
 int uv_stream_poll(uv_stream_poll_t* req,
@@ -122,7 +103,7 @@ The callback takes the following form:
 typedef void (*uv_timeout_cb)(uv_timeout_t* req, int status)
 ~~~~
 
-The status argument would indicate success or failure. One possible failure is cancellation,
+The status argument would indicate success or failure. The only possible failure is cancellation,
 which would make status == `UV_ECANCELED`.
 
 Implementation detail: Timers will be the first thing to be processed after polling for i/o.
@@ -149,7 +130,7 @@ int uv_callback_threadsafe(uv_callback_t* req, uv_loop_t* loop, uv_callback_cb c
 The callback definition:
 
 ~~~~
-typedef void (*uv_callback_cb)(uv_callback_t* req, int status)
+typedef void (*uv_callback_cb)(uv_callback_t* req)
 ~~~~
 
 Implementation detail: since the callback request cannot be safely initialized outside
@@ -160,6 +141,8 @@ requests.
 The introduction of `uv_callback` would deprecate and remove `uv_async_t` handles.
 Now, in some cases it might be desired to just wake up the event loop, and having to
 create a request might be too much, thus, the following API call is also proposed:
+
+`uv_callback` requests cannot be cancelled.
 
 ~~~~
 void uv_loop_wakeup(uv_loop_t* loop)
@@ -202,9 +185,3 @@ The `req->fd` field will contain a `uv_os_fd_t` value, which the user can use to
 with `uv_tcp_open` for example. (This needs further investigation to verify it would
 work in all cases).
 
-
-### A note on uv_cancel
-
-Gradually, `uv_cancel` needs to be improved to allow for cancelling any kind of requests.
-Some of them might be a bit harder, but `uv_timeout` and `uv_callback` should be easy
-enough to do.
