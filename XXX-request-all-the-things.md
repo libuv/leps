@@ -28,7 +28,7 @@ int uv_read(uv_read_t* req,
             uv_stream_t* handle,
             const uv_buf_t[] bufs,
             unsigned int nbufs,
-            uv_read_cb, cb)
+            uv_read_cb cb)
 ~~~~
 
 The read callback is defined as:
@@ -91,7 +91,7 @@ int uv_timeout(uv_timeout_t* req,
 ~~~~
 
 The `timeout` is now expressed as a double. The fractional part will get rounded up
-to platform granularity. For example: 1.2345 becomes 1230 ms or 1,234,500 us,
+to platform granularity. For example: 1.2345 becomes 1235 ms or 1,234,500 us,
 depending on whether the platform supports sub-millisecond precision.
 
 Timers are one shot, so no assumptions are made and repeating timers can be easily
@@ -157,15 +157,16 @@ could be used instead.
 Note: As a result of this addition, `uv_idle_t` handles will be deprecated an removed.
 It may not seem obvious at first, but `uv_callback` achieves the same: the loop won’t block
 for i/o if any `uv_callback` request is pending. This becomes even more obvious with the
-“‘pull based’ event loop” proposal.
+"pull based’ event loop" proposal.
 
 
 ### uv_accept / uv_listen
 
 Currently there is no way to stop listening for incoming connections. Making the concept
 of accepting connections also request based makes the API more consistent and easier
-to use: if the user decides so (maybe because she is getting EMFILE because she ran
-out of file descriptors, for example) she can stop accepting new connections.
+to use: if the user decides so (maybe because the system ran out of file descriptors
+and EMFILE erros are returned, foe example) it's possible to stop accepting new
+connections by just stopping to create new accept requests.
 
 New API:
 
