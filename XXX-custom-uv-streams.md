@@ -39,7 +39,7 @@ The basis of the custom stream implementation will look much the same as existin
 
 ``` C
 /* custom stream implementation functions */
-typedef int (*uv_custom_accept)(uv_stream_t* server, uv_stream_t* server);
+typedef int (*uv_custom_accept)(uv_stream_t* server, uv_stream_t* client);
 typedef int (*uv_custom_listen)(uv_stream_t* server, int backlog, uv_connection_cb cb);
 typedef int (*uv_custom_close)(uv_handle_t* handle);
 
