@@ -39,9 +39,9 @@ The basis of the custom stream implementation will look much the same as existin
 
 ``` C
 /* custom stream implementation functions */
-typedef int (*uv_custom_accept)(uv_stream_t* server, uv_stream_t* client);
-typedef int (*uv_custom_listen)(uv_stream_t* server, int backlog, uv_connection_cb cb);
-typedef int (*uv_custom_close)(uv_handle_t* handle);
+typedef int (*uv_custom_accept)(uv_custom_t* server, uv_custom_t* client);
+typedef int (*uv_custom_listen)(uv_custom_t* server, int backlog, uv_connection_cb cb);
+typedef int (*uv_custom_close)(uv_custom_t* handle);
 
 /* custom stream data structure */
 struct uv_custom_s {
@@ -57,9 +57,12 @@ struct uv_custom_s {
   uv_custom_close close;
   
 /* custom stream API functions */
+/* uv.h */
 uv_custom_init(uv_loop_t* loop, uv_custom_t* handle);
 uv_custom_open(uv_custom_t* handle, int fd);
-uv_custom_close(uv_custom_t* handle);
+
+/* uv-common.h */
+uv__custom_close(uv_custom_t* handle);
 ```
 
 Note that the custom stream will expect a normal fd for use and will set up an io_watcher with the fd just like TCP, UDP, and Named Pipes.  In this way, custom streams can reuse much of the core code for data flow.  It will be expected for the custom stream implementor to facilitate and provide such an fd upon stream open.
@@ -72,6 +75,9 @@ Although there is a stream.c file that is platform specific, the custom stream f
 
 For testing and implementation purposes, a simple reference implementation will be created.  This will involve a simple memory buffer implementation of a custom stream that can be sent from the same process, or another process via shared memory.  This implementation would be a good start for anyone looking to use shared memory with their custom stream as well.
 
+I have already started experimenting with this concept in my own fork of libuv located here:
+[custom stream libuv fork](https://github.com/coderkevin/libuv/tree/custom-streams)
+
 #### UNIX
 
 In Linux and other UNIX environments, POSIX shared memory can be used to fulfill the file descriptor needs.  When a shared memory region is created, a file descriptor is returned and can be used for this purpose.
@@ -81,6 +87,8 @@ References:
 [SHM Overview](http://man7.org/linux/man-pages/man7/shm_overview.7.html)
 
 [How to create an fd for a memory region](http://stackoverflow.com/questions/12081720/in-linux-how-to-create-a-file-descriptor-for-a-memory-region)
+
+[My own demo of using this functionality with FDs on Ubuntu Linux](https://github.com/coderkevin/testcode/commit/7c289b8ac9b5d0a064b305fc3bdac15b32443268)
 
 #### Windows
 
