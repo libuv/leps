@@ -39,7 +39,7 @@ The basis of the custom stream implementation will look much the same as existin
 
 ``` C
 /* custom stream implementation functions */
-typedef int (*uv_custom_accept)(uv_custom_t* server, uv_custom_t* client);
+typedef int (*uv_custom_accept)(uv_custom_t* server);
 typedef int (*uv_custom_listen)(uv_custom_t* server, int backlog, uv_connection_cb cb);
 typedef int (*uv_custom_close)(uv_custom_t* handle);
 
@@ -70,6 +70,16 @@ Note that the custom stream will expect a normal fd for use and will set up an i
 ### Platform Abstraction and Build Architecture
 
 Although there is a stream.c file that is platform specific, the custom stream function pointers are designed to match the Stream API, and not the underlying implementation for each platform.  This allows the custom stream implementation to handle the specifics of each platform as that stream requires.  It is up to the implementor of each custom stream type to decide upon which platforms to support.  It is expected that the implementation of each custom stream will be built separately and will bring in libuv as a dependency of its build process on each platform it supports.
+
+#### Optional Implementation Details
+
+It is not required for a custom stream type to implement the "accept" and "listen" function pointers if it is only designed for client streams.  The function pointers may be assigned to NULL.  However, trying to use such a stream as a server stream will obviously result in an error.
+
+Also, if a custom stream type does not require any special cleanup required beyond the fd it uses, the "close" function pointer may also be set to NULL and the fd will simply be closed as normal.
+
+### Things Not Implemented
+
+For unix streams, the "uv__handle_type" function does not include custom streams, because this is not needed or applicable for custom streams--especially since differing types of custom streams are incompatible anyway.
 
 ### Reference Implementation
 
