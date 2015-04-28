@@ -83,27 +83,7 @@ For unix streams, the "uv__handle_type" function does not include custom streams
 
 ### Reference Implementation
 
-For testing and implementation purposes, a simple reference implementation will be created.  This will involve a simple memory buffer implementation of a custom stream that can be sent from the same process, or another process via shared memory.  This implementation would be a good start for anyone looking to use shared memory with their custom stream as well.
+For testing and implementation purposes, a simple reference implementation will be created.  This will involve a simple socket-based implementation.  For a simple implementation, socketpair() will be used.  For a more elaborate example, a TCP server and client will be implemented.  This implementation would be a good start for anyone looking to use a socketpair for their implementation as well.
 
 I have already started experimenting with this concept in my own fork of libuv located here:
 [custom stream libuv fork](https://github.com/coderkevin/libuv/tree/custom-streams)
-
-#### UNIX
-
-In Linux and other UNIX environments, POSIX shared memory can be used to fulfill the file descriptor needs.  When a shared memory region is created, a file descriptor is returned and can be used for this purpose.
-
-References:
-
-[SHM Overview](http://man7.org/linux/man-pages/man7/shm_overview.7.html)
-
-[How to create an fd for a memory region](http://stackoverflow.com/questions/12081720/in-linux-how-to-create-a-file-descriptor-for-a-memory-region)
-
-[My own demo of using this functionality with FDs on Ubuntu Linux](https://github.com/coderkevin/testcode/commit/7c289b8ac9b5d0a064b305fc3bdac15b32443268)
-
-#### Windows
-
-For Windows, shared memory has to have an associated file in the system.  This is due to the permissions system for windows requiring common permissions between processes.  So, for the Windows implementation, a file will need to be created and used for the memory map.  This should not affect performance, as the memory buffer will stay resident in memory as long as it is active, and will be cleared on startup.
-
-References:
-
-[Managing Memory Mapped Files](https://msdn.microsoft.com/en-us/library/ms810613.aspx)
