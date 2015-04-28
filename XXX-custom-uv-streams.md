@@ -87,3 +87,8 @@ For testing and implementation purposes, a simple reference implementation will 
 
 I have already started experimenting with this concept in my own fork of libuv located here:
 [custom stream libuv fork](https://github.com/coderkevin/libuv/tree/custom-streams)
+
+### Remaining Questions
+
+Would it be possible for the custom stream architecture to support file descriptors that cannot be added to epoll?  Is this desirable or important?  It might be more suitable for certain streams to utilize a shm fd instead of a socketpair fd.  Thoughts/comments are appreciated on this topic.
+
