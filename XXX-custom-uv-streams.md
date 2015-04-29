@@ -90,5 +90,7 @@ I have already started experimenting with this concept in my own fork of libuv l
 
 ### Remaining Questions
 
-Would it be possible for the custom stream architecture to support file descriptors that cannot be added to epoll?  Is this desirable or important?  It might be more suitable for certain streams to utilize a shm fd instead of a socketpair fd.  Thoughts/comments are appreciated on this topic.
+1. I'm still not certain how the custom stream implementation will handle both streams that support epoll and ones that do not.  I'm still investigating how to do this on my libuv fork listed above.
+2. Architecturally, it initially made sense to support the void* context for the stream.  However, I wonder if it would be better to create a subclass-struct of uv_custom_t to add stream-specific attributes, which is the way most other stream structs work.  I'm open to thoughts in this area as well.
+
 
