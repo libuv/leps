@@ -1,12 +1,9 @@
 # Libuv Enhancement Proposals
 
-## Draft
-
-* [005-windows-handles-not-fd](https://github.com/libuv/leps/blob/master/005-windows-handles-not-fd.md)
-
 ## Approved
 
 * [003-create-sockets-early](https://github.com/libuv/leps/blob/master/003-create-sockets-early.md)
+* [005-windows-handles-not-fd](https://github.com/libuv/leps/blob/master/005-windows-handles-not-fd.md)
 
 
 ## Rejected
