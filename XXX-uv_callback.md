@@ -168,13 +168,16 @@ changes inside the current uv_async code.
 
 The uv_callback_t will have the same fields of uv_async_t with some additions:
 
-    struct uv_callback_s {
-      uv_async_t async;
-      int usequeue;      /* async->data points to a queue (singly linked list) */
-      uv_mutex_t mutex;  /* used to access the queue */
-    };
+    #define UV_CALLBACK_PRIVATE_FIELDS   \
+      <other fields here>                \
+      int usequeue;                      \
+      uv_mutex_t mutex;                  \
+
+If `usequeue==1` then `callback_t->data` points to a queue (singly linked list).
 
 Optionally the queue can be in a private field instead of the public data field.
+
+The mutex is used to access the queue.
 
 ## uv_callback_call_t
 
@@ -233,8 +236,7 @@ int uv_callback_init(
 ## uv_callback_fire
 
 The uv_callback_fire will store the call info in the callback_call queue/list and
-then fire the "uv_async_send". Later it will replace the uv_async_send function,
-when both functions will be merged.
+then probably do the same work of the `uv_async_send`.
 
 ```
 int uv_callback_fire(uv_callback_t* callback, void *data, uv_callback_t* notify) {
@@ -259,7 +261,7 @@ int uv_callback_fire(uv_callback_t* callback, void *data, uv_callback_t* notify)
   	callback->data = data;
   }
 
-  return uv_async_send((uv_async_t*)callback);  // <-- later this will be merged here
+  /* here insert the code from uv_async_send, maybe modified */
 }
 ```
 
@@ -276,6 +278,7 @@ Here is a pseudo-code:
     while(data = dequeue(async->queue)):
       result = fire_callback(async->cb, data);
       if (call->notify) uv_callback_fire(call->notify, result);
+      free(call);
 
 
 # Note
