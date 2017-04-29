@@ -26,20 +26,23 @@ work is running too fast.
 
 The call coalescing is enabled using the UV_COALESCE constant.
 
-### In the main thread
+### In the receiver thread
 
-    uv_callback_t progress;
-    
-    void on_progress(uv_callback_t *handle, void *value) {
-       printf("progress: %d\n", (int)value);
-    }
-    
-    uv_callback_init(loop, &progress, on_progress, UV_COALESCE);
+```C
+uv_callback_t progress;
 
-### In the worker thread
+void on_progress(uv_callback_t *handle, void *value) {
+   printf("progress: %d\n", (int)value);
+}
 
-    uv_callback_fire(&progress, (void*)value, NULL);
+uv_callback_init(loop, &progress, on_progress, UV_COALESCE);
+```
 
+### In the sender thread
+
+```C
+uv_callback_fire(&progress, (void*)value, NULL);
+```
 
 
 ## Sending allocated data that must be released
@@ -48,21 +51,24 @@ In this case the calls cannot coalesce because it would cause data loss and memo
 
 So instead of UV_COALESCE it uses UV_DEFAULT.
 
-### In the main thread
+### In the receiver thread
 
-    uv_callback_t send_data;
-    
-    void on_data(uv_callback_t *handle, void *data) {
-      do_something(data);
-      free(data);
-    }
-    
-    uv_callback_init(loop, &send_data, on_data, UV_DEFAULT);
+```C
+uv_callback_t send_data;
 
-### In the worker thread
+void on_data(uv_callback_t *handle, void *data) {
+  do_something(data);
+  free(data);
+}
 
-    uv_callback_fire(&send_data, data, NULL);
+uv_callback_init(loop, &send_data, on_data, UV_DEFAULT);
+```
 
+### In the sender thread
+
+```C
+uv_callback_fire(&send_data, data, NULL);
+```
 
 
 ## Firing the callback synchronously
@@ -74,21 +80,24 @@ The main difference from the previous example is the use of UV_SYNCHRONOUS.
 
 This can be used when the worker thread does not have a loop.
 
-### In the main thread
+### In the receiver thread
 
-    uv_callback_t send_data;
-    
-    void on_data(uv_callback_t *handle, void *data) {
-      do_something(data);
-      free(data);
-    }
-    
-    uv_callback_init(loop, &send_data, on_data, UV_DEFAULT);
+```C
+uv_callback_t send_data;
 
-### In the worker thread
+void on_data(uv_callback_t *handle, void *data) {
+  do_something(data);
+  free(data);
+}
 
-    uv_callback_fire(&send_data, data, UV_SYNCHRONOUS);
+uv_callback_init(loop, &send_data, on_data, UV_DEFAULT);
+```
 
+### In the sender thread
+
+```C
+uv_callback_fire(&send_data, data, UV_SYNCHRONOUS);
+```
 
 
 ## Firing the callback and getting the result asynchronously
@@ -98,30 +107,33 @@ own callback when the function called on the other thread loop returns.
 
 Note that there are 2 callback definitions here, one for each thread.
 
-### In the main thread
+### In the called thread
 
-    uv_callback_t send_data;
-    
-    void * on_data(uv_callback_t *handle, void *data) {
-      int result = do_something(data);
-      free(data);
-      return (void*)result;
-    }
-    
-    uv_callback_init(loop, &send_data, (uv_callback_cb)on_data, UV_DEFAULT);
+```C
+uv_callback_t send_data;
 
-### In the worker thread
+void * on_data(uv_callback_t *handle, void *data) {
+  int result = do_something(data);
+  free(data);
+  return (void*)result;
+}
 
-    uv_callback_t data_sent;
-    
-    void on_data_sent(uv_callback_t *handle, void *result) {
-      printf("The result is %d\n", (int)result);
-    }
-    
-    uv_callback_init(loop, &data_sent, on_data_sent, UV_DEFAULT);
+uv_callback_init(loop, &send_data, (uv_callback_cb)on_data, UV_DEFAULT);
+```
 
-    uv_callback_fire(&send_data, data, &data_sent);
+### In the calling thread
 
+```C
+uv_callback_t data_sent;
+
+void on_data_sent(uv_callback_t *handle, void *result) {
+  printf("The result is %d\n", (int)result);
+}
+
+uv_callback_init(loop, &data_sent, on_data_sent, UV_DEFAULT);
+
+uv_callback_fire(&send_data, data, &data_sent);
+```
 
 
 # Additions
@@ -148,7 +160,9 @@ Used in uv_callback_fire:
 
 This last one is declared like this:
 
-	#define UV_SYNCHRONOUS  ((uv_callback_t*)-1);
+```C
+#define UV_SYNCHRONOUS  ((uv_callback_t*)-1);
+```
 
 It is used in the 3rd argument of uv_callback_fire() function that expects a
 uv_callback_t*.
@@ -168,10 +182,12 @@ changes inside the current uv_async code.
 
 The uv_callback_t will have the same fields of uv_async_t with some additions:
 
-    #define UV_CALLBACK_PRIVATE_FIELDS   \
-      <other fields here>                \
-      int usequeue;                      \
-      uv_mutex_t mutex;                  \
+```C
+#define UV_CALLBACK_PRIVATE_FIELDS   \
+  <other fields here>                \
+  int usequeue;                      \
+  uv_mutex_t mutex;                  \
+```
 
 If `usequeue==1` then `callback_t->data` points to a queue (singly linked list).
 
@@ -188,25 +204,29 @@ this fired callback returns.
 For each call there will be one of this in a linked list. The pointer to the first
 will be in async->data or a private field.
 
-    struct uv_callback_call_s {
-      uv_callback_call_t *next; /* pointer to the next call in the queue */
-      void *data;               /* data argument for this call */
-      uv_callback_t *notify;    /* callback to be fired with the result of this one */
-    };
+```C
+struct uv_callback_call_s {
+  uv_callback_call_t *next; /* pointer to the next call in the queue */
+  void *data;               /* data argument for this call */
+  uv_callback_t *notify;    /* callback to be fired with the result of this one */
+};
+```
 
 ## uv_callback_cb
 
 The callback function must have the data as an argument because the data
 will be retrieved from the call queue.
 
-    typedef void (*uv_callback_cb)(uv_callback_t* handle, void *data);
+```C
+typedef void (*uv_callback_cb)(uv_callback_t* handle, void *data);
+```
 
 ## uv_callback_init
 
 The uv_callback_init will just initialize the structure with the given values.
 Something like this:
 
-```
+```C
 int uv_callback_init(
  uv_loop_t* loop,
  uv_callback_t* callback,
@@ -238,7 +258,7 @@ int uv_callback_init(
 The uv_callback_fire will store the call info in the callback_call queue/list and
 then probably do the same work of the `uv_async_send`.
 
-```
+```C
 int uv_callback_fire(uv_callback_t* callback, void *data, uv_callback_t* notify) {
 
   if (!callback) return UV_ARGS;
@@ -258,7 +278,7 @@ int uv_callback_fire(uv_callback_t* callback, void *data, uv_callback_t* notify)
     llist_add(&callback->data, call);
     uv_mutex_leave(&callback->mutex);
   } else {
-  	callback->data = data;
+    callback->data = data;
   }
 
   /* here insert the code from uv_async_send, maybe modified */
@@ -275,11 +295,12 @@ from the call queue.
 
 Here is a pseudo-code:
 
-    while(data = dequeue(async->queue)):
-      result = fire_callback(async->cb, data);
-      if (call->notify) uv_callback_fire(call->notify, result);
-      free(call);
-
+```javascript
+while(data = dequeue(async->queue)):
+  result = fire_callback(async->cb, data);
+  if (call->notify) uv_callback_fire(call->notify, result);
+  free(call);
+```
 
 # Note
 
