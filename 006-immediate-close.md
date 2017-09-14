@@ -156,16 +156,24 @@ with null callback. However, it has the issue that an asynchronous close might s
 without a callback so the application would need the ability to set it after caling
 `uv_close`.
 
-Note that if immediate close is successful, callbacks of outstanding requests are
-*not* called. Since the application has closed the handle it is clearly not interested
-in their outcome. Also, calling those callbacks directly from `uv_close` is hazardous
-as the application may not be expecting that. However note that for the handle types
-for which immediate close support is proposed (in the next section), there are no
-requests that could be canceled anyway.
-
 A third option would be to add a new function such as `uv_close_now` which would be
 equivalent to calling `uv_close` with null callback as in the first proposal, and to
 not modify the behavior of `uv_close`.
+
+A question may arise about whether and when callbacks of outstanding requests
+(such as `uv_connect_t` and `uv_write_t`) would be called in case that immediate
+close is successful. Two approaches are possible:
+- These callbacks are called with `UV_ECANCELED` status from within `uv_close`.
+  The advantage of this is that is preserves the existing guarantes that the
+  callback of a request is eventually invoked.
+- These callbacks are not called. The advantage of this is that this is a simpler
+  and safer design. Because applications may not be expecting a callback from
+  `uv_close` and may possibly need special cases in the callback implementations.
+
+**However**, for the handle types for which immediate close support is proposed
+(in the next section), there are no requests that could be canceled anyway. So if
+the implementation of immediate close is initially limited to these handle types,
+no decision is yet needed concerning this.
 
 ## Implementation
 
